@@ -1,0 +1,10 @@
+pandas
+numpy
+pyarrow
+scikit-learn
+matplotlib
+pyyaml
+fastapi
+uvicorn[standard]
+joblib
+requests

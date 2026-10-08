@@ -1,0 +1,24 @@
+# 大文件与密钥（不提交 GitHub）
+models/*
+!models/.gitkeep
+data/raw/*
+!data/raw/.gitkeep
+data/processed/*
+!data/processed/.gitkeep
+outputs/*
+!outputs/.gitkeep
+experiments/*
+!experiments/.gitkeep
+configs/llm.yaml
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+
+# 前端
+web/node_modules/
+web/dist/
+
+# 系统
+.DS_Store

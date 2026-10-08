@@ -1,0 +1,42 @@
+# ERC 基线实验配置（第 1–2 周）
+seed: 42
+
+data:
+  raw_dir: data/raw
+  processed_dir: data/processed
+  dataset: dailydialog
+
+# DailyDialog 官方标签映射（Li et al., IJCNLP 2017）
+emotion_labels:
+  0: no_emotion
+  1: anger
+  2: disgust
+  3: fear
+  4: happiness
+  5: sadness
+  6: surprise
+
+tfidf:
+  ngram_range: [1, 2]
+  min_df: 2
+  max_features: 30000
+
+logreg:
+  max_iter: 1000
+  C: 1.0
+
+# 趋势图的情绪分数映射：仅用于可视化展示，不是心理学意义上的情绪强度
+trend_score:
+  happiness: 1.0
+  surprise: 0.2
+  no_emotion: 0.0
+  sadness: -0.5
+  fear: -0.6
+  disgust: -0.7
+  anger: -0.8
+
+negative_emotions: [anger, disgust, fear, sadness]
+
+trend_figures:
+  num_conversations: 12
+  low_confidence_threshold: 0.5
