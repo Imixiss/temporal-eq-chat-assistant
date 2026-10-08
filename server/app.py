@@ -1,0 +1,165 @@
+"""分析服务：POST /api/analyze
+
+职责：
+1. 加载 ERC 最佳模型（outputs/checkpoints/erc_best_model.joblib），逐轮输出情绪标签+概率；
+2. 计算时序指标与冲突风险启发式（规则未验证，见 conflict_heuristic.py 声明）；
+3. 若请求头或 configs/llm.yaml 提供了 LLM 配置，则代理调用 OpenAI 兼容接口，
+   生成局势分析/沟通建议/回复草稿；否则 suggestions=null, llm_status="not_configured"。
+
+启动：PYTHONPATH=. uvicorn server.app:app --port 8000
+"""
+import json
+from pathlib import Path
+
+import joblib
+import requests
+import yaml
+from fastapi import FastAPI, Header
+from pydantic import BaseModel
+
+from src.analysis.conflict_heuristic import assess
+from src.analysis.emotion_trend import temporal_metrics
+from src.utils.common import PROJECT_ROOT, load_config
+
+cfg = load_config()
+MODEL_PATH = PROJECT_ROOT / "outputs" / "checkpoints" / "erc_best_model.joblib"
+NEG_EMOS = cfg["negative_emotions"]
+
+app = FastAPI(title="EQ Assistant Analysis Service")
+
+_model = None
+
+
+def get_model():
+    global _model
+    if _model is None:
+        _model = joblib.load(MODEL_PATH)
+    return _model
+
+
+class TurnIn(BaseModel):
+    speaker: str
+    text: str
+
+
+class AnalyzeIn(BaseModel):
+    turns: list[TurnIn]
+
+
+def load_llm_file_config() -> dict:
+    p = PROJECT_ROOT / "configs" / "llm.yaml"
+    if p.exists():
+        with open(p, encoding="utf-8") as f:
+            return yaml.safe_load(f) or {}
+    return {}
+
+
+LLM_SYSTEM_PROMPT = """你是一位高情商沟通顾问。用户会给你一段多轮对话，以及每轮的情绪识别结果（由机器学习模型给出，可能有个别误差，仅供参考）。
+
+请基于整段对话的语境与情绪走向，严格输出 JSON（不要输出其他内容），格式：
+{
+  "situation_analysis": "2-4 句话：这段对话发生了什么，双方各自可能的诉求与情绪变化",
+  "advice": ["3-5 条具体的沟通建议，每条一句话"],
+  "reply_drafts": [
+    {"style": "风格名（如：温和安抚型）", "text": "可直接发送的回复"},
+    {"style": "风格名", "text": "..."},
+    {"style": "风格名", "text": "..."}
+  ]
+}
+要求：回复草稿要给 2-3 条不同风格；不要说教；如果对话是英文就用英文起草，中文就用中文。"""
+
+
+def call_llm(turns: list[dict], key: str, base_url: str, model: str) -> dict:
+    timeline = "\n".join(
+        f"{i+1}. [{t['speaker']}] {t['text']}  （情绪: {t['emotion']}, 置信度 {t['confidence']:.2f}）"
+        for i, t in enumerate(turns)
+    )
+    resp = requests.post(
+        f"{base_url.rstrip('/')}/chat/completions",
+        headers={"Authorization": f"Bearer {key}", "Content-Type": "application/json"},
+        json={
+            "model": model,
+            "messages": [
+                {"role": "system", "content": LLM_SYSTEM_PROMPT},
+                {"role": "user", "content": f"对话及情绪识别结果：\n{timeline}"},
+            ],
+            "temperature": 0.7,
+            "response_format": {"type": "json_object"},
+        },
+        timeout=60,
+    )
+    resp.raise_for_status()
+    content = resp.json()["choices"][0]["message"]["content"]
+    return json.loads(content)
+
+
+@app.get("/api/health")
+def health():
+    llm_file = load_llm_file_config()
+    return {
+        "status": "ok",
+        "model_loaded": MODEL_PATH.exists(),
+        "llm_configured_in_file": bool(llm_file.get("api_key")),
+    }
+
+
+@app.post("/api/analyze")
+def analyze(
+    body: AnalyzeIn,
+    x_llm_key: str | None = Header(default=None),
+    x_llm_base_url: str | None = Header(default=None),
+    x_llm_model: str | None = Header(default=None),
+):
+    m = get_model()
+    vec, clf = m["vectorizer"], m["clf"]
+    classes = list(m["classes"])
+
+    # 逐轮情绪识别
+    turns = []
+    for i, t in enumerate(body.turns):
+        X = vec.transform([t.text])  # 最佳模型 E1w 仅用当前轮文本
+        proba = clf.predict_proba(X)[0]
+        pred = clf.predict(X)[0]
+        turns.append({
+            "turn_id": i,
+            "speaker": t.speaker,
+            "text": t.text,
+            "emotion": pred,
+            "confidence": round(float(proba.max()), 4),
+            "probabilities": {c: round(float(p), 4) for c, p in zip(classes, proba)},
+        })
+
+    # 时序指标 + 风险启发式
+    metric_input = [
+        {"predicted_emotion": t["emotion"], "probabilities": t["probabilities"]}
+        for t in turns
+    ]
+    metrics = temporal_metrics(metric_input, cfg["trend_score"], NEG_EMOS)
+    risk = assess(metrics)
+
+    # LLM 建议层：优先请求头，其次 configs/llm.yaml
+    file_cfg = load_llm_file_config()
+    key = x_llm_key or file_cfg.get("api_key")
+    base_url = x_llm_base_url or file_cfg.get("base_url", "https://api.moonshot.cn/v1")
+    model_name = x_llm_model or file_cfg.get("model", "moonshot-v1-8k")
+
+    suggestions = None
+    llm_status = "not_configured"
+    llm_message = "未配置 LLM：在网页右上角「大模型设置」填入 API Key，或在 configs/llm.yaml 中配置"
+    if key:
+        try:
+            suggestions = call_llm(turns, key, base_url, model_name)
+            llm_status = "ok"
+            llm_message = None
+        except Exception as e:  # noqa: BLE001 - 把错误透传给前端展示
+            llm_status = "error"
+            llm_message = str(e)[:300]
+
+    return {
+        "turns": turns,
+        "metrics": metrics,
+        "risk": risk,
+        "suggestions": suggestions,
+        "llm_status": llm_status,
+        "llm_message": llm_message,
+    }
