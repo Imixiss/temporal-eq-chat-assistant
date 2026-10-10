@@ -1,4 +1,4 @@
-"""分析服务：POST /api/analyze + POST /api/ocr
+"""分析服务：POST /api/analyze + POST /api/ocr + GET /api/usage
 
 职责：
 1. 逐轮情绪识别：中文走 RoBERTa（outputs/checkpoints/erc_zh），英文走 TF-IDF 基线；
@@ -6,10 +6,12 @@
 3. 若请求头或 configs/llm.yaml 提供了 LLM 配置，则代理调用 OpenAI 兼容接口，
    生成局势分析/沟通建议/回复草稿；否则 suggestions=null, llm_status="not_configured"。
 4. /api/ocr：调用 scripts/ocr.swift（macOS Vision）本机离线识别聊天截图。
+5. 用量监控：每次成功调用记入 outputs/llm_usage.jsonl，达到 budget_yuan 后熔断。
 
 启动：PYTHONPATH=. uvicorn server.app:app --port 8000
 """
 import json
+import time
 from pathlib import Path
 
 import joblib
@@ -109,7 +111,8 @@ LLM_SYSTEM_PROMPT = """你是一位高情商沟通顾问。用户会给你一段
 要求：回复草稿要给 2-3 条不同风格；不要说教；如果对话是英文就用英文起草，中文就用中文。"""
 
 
-def call_llm(turns: list[dict], key: str, base_url: str, model: str) -> dict:
+def call_llm(turns: list[dict], key: str, base_url: str, model: str,
+             pin: float, pout: float) -> dict:
     timeline = "\n".join(
         f"{i+1}. [{t['speaker']}] {t['text']}  （情绪: {t['emotion']}, 置信度 {t['confidence']:.2f}）"
         for i, t in enumerate(turns)
@@ -129,7 +132,10 @@ def call_llm(turns: list[dict], key: str, base_url: str, model: str) -> dict:
         timeout=60,
     )
     resp.raise_for_status()
-    content = resp.json()["choices"][0]["message"]["content"]
+    data = resp.json()
+    if data.get("usage"):
+        record_usage(data["usage"], model, pin, pout)
+    content = data["choices"][0]["message"]["content"]
     return parse_llm_json(content)
 
 
@@ -156,6 +162,61 @@ def health():
 
 
 OCR_SCRIPT = PROJECT_ROOT / "scripts" / "ocr.swift"
+USAGE_LOG = PROJECT_ROOT / "outputs" / "llm_usage.jsonl"
+
+
+def llm_prices_and_budget(file_cfg: dict) -> tuple[float, float, float]:
+    """单价（元/百万 tokens）与预算（元）。默认值为 kimi-k3 中国站官方价
+    （输入 ¥20 / 输出 ¥100，2026-10 查询；缓存命中会更便宜，故估算偏保守）。
+    可在 configs/llm.yaml 用 price_in_per_million / price_out_per_million / budget_yuan 覆盖。"""
+    pin = float(file_cfg.get("price_in_per_million", 20.0))
+    pout = float(file_cfg.get("price_out_per_million", 100.0))
+    budget = float(file_cfg.get("budget_yuan", 1.5))
+    return pin, pout, budget
+
+
+def usage_totals(pin: float, pout: float) -> dict:
+    """汇总本地账本。注意：这是按 API 返回 usage 估算的本地记录，
+    实际扣费以 Moonshot 控制台为准（缓存命中价更低，此处按未命中保守估算）。"""
+    calls = prompt_toks = completion_toks = 0
+    cost = 0.0
+    if USAGE_LOG.exists():
+        for line in USAGE_LOG.read_text(encoding="utf-8").splitlines():
+            if not line.strip():
+                continue
+            r = json.loads(line)
+            calls += 1
+            prompt_toks += r.get("prompt_tokens", 0)
+            completion_toks += r.get("completion_tokens", 0)
+            cost += r.get("cost_yuan", 0.0)
+    return {
+        "calls": calls,
+        "prompt_tokens": prompt_toks,
+        "completion_tokens": completion_toks,
+        "cost_yuan": round(cost, 4),
+    }
+
+
+def record_usage(usage: dict, model: str, pin: float, pout: float) -> None:
+    pt = usage.get("prompt_tokens", 0)
+    ct = usage.get("completion_tokens", 0)  # kimi-k3 思考 tokens 计入输出
+    cost = pt * pin / 1e6 + ct * pout / 1e6
+    USAGE_LOG.parent.mkdir(parents=True, exist_ok=True)
+    with open(USAGE_LOG, "a", encoding="utf-8") as f:
+        f.write(json.dumps({
+            "ts": time.strftime("%Y-%m-%d %H:%M:%S"),
+            "model": model,
+            "prompt_tokens": pt,
+            "completion_tokens": ct,
+            "cost_yuan": round(cost, 6),
+        }, ensure_ascii=False) + "\n")
+
+
+@app.get("/api/usage")
+def usage():
+    file_cfg = load_llm_file_config()
+    pin, pout, budget = llm_prices_and_budget(file_cfg)
+    return {**usage_totals(pin, pout), "budget_yuan": budget}
 
 
 @app.post("/api/ocr")
@@ -242,13 +303,20 @@ def analyze(
     llm_status = "not_configured"
     llm_message = "未配置 LLM：在网页右上角「大模型设置」填入 API Key，或在 configs/llm.yaml 中配置"
     if key:
-        try:
-            suggestions = call_llm(turns, key, base_url, model_name)
-            llm_status = "ok"
-            llm_message = None
-        except Exception as e:  # noqa: BLE001 - 把错误透传给前端展示
-            llm_status = "error"
-            llm_message = str(e)[:300]
+        pin, pout, budget = llm_prices_and_budget(file_cfg)
+        spent = usage_totals(pin, pout)["cost_yuan"]
+        if spent >= budget:
+            # 预算熔断：达到上限后不再调用，情绪识别/趋势分析不受影响
+            llm_status = "budget_exceeded"
+            llm_message = f"已达到大模型预算上限（¥{spent:.3f} / ¥{budget}），本次跳过建议生成。如需继续，请在 configs/llm.yaml 调高 budget_yuan。"
+        else:
+            try:
+                suggestions = call_llm(turns, key, base_url, model_name, pin, pout)
+                llm_status = "ok"
+                llm_message = None
+            except Exception as e:  # noqa: BLE001 - 把错误透传给前端展示
+                llm_status = "error"
+                llm_message = str(e)[:300]
 
     return {
         "turns": turns,
