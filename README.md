@@ -58,6 +58,8 @@ PYTHONPATH=. python -m src.models.train_erc_zh --epochs 3 # 正式训练（约 1
 ```
 
 注意：中文训练数据为微博单帖（非对话），且不含 disgust 类——局限详见 `docs/dataset.md`。
+已训练完成的指标与跨域局限（含反讽误判案例）见 `docs/experiment_log.md` 的 W3 记录。
+后端 `/api/analyze` 会按语言自动路由：中文走 RoBERTa，英文走 TF-IDF 基线。
 
 ## 目录结构
 

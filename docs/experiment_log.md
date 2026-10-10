@@ -55,3 +55,17 @@ fear/disgust 样本太少（test 各 17/47 条），指标不稳定，解释时�
 - 对应修改：server/app.py 移除 temperature / response_format 参数，新增 parse_llm_json() 容错解析（去围栏 + 截取首个 {...} 片段）；前端与示例配置默认模型名统一改为 kimi-k3。
 - 端到端验证：POST /api/analyze 输入 4 轮中文对话（升职/陪伴冲突场景），llm_status=ok，返回局势分析、5 条建议、3 条不同风格回复草稿，内容合理且正确识别了情绪模型的误判。
 - 已知局限（不变）：英文 ERC 模型对中文全部输出 no_emotion（W3 中文模型解决）；冲突预警仍为未验证启发式。
+
+## W3 中文 ERC 模型（2026-10-10）
+
+- 模型：hfl/chinese-roberta-wwm-ext + 分类头，微博情绪数据（train 8,606 / test 3,000，6 类，无 disgust），MPS 训练 3 epochs，18.2 分钟，种子 42。
+- 指标由 `src/models/train_erc_zh.py` 自动生成于 `outputs/metrics/erc_zh_results.json`：**Accuracy 0.7973 / Macro-F1 0.6673 / Weighted-F1 0.7960**。
+- 分类报告（test）：happiness F1 0.91、anger 0.79、no_emotion 0.68、sadness 0.60、fear 0.59、surprise 0.44（support 仅 68，指标不稳）。
+- 后端接入：`server/app.py` 按 CJK 字符占比 >0.2 逐轮路由——中文走 RoBERTa，英文走原 TF-IDF E1w。趋势指标对缺失的 disgust 类按 0 处理，不受影响。
+- 端到端验证：升职/陪伴冲突 4 轮对话，第 1、3 轮识别正确（happiness 0.99 / anger 0.75），趋势判为 worsening + medium 风险，LLM 分析正常。
+
+### 必须标注的局限
+
+1. **与英文基线不可直接比**：0.6673 是微博数据上的成绩，DailyDialog 的 0.3921 是另一个数据集，两者任务难度不同。
+2. **跨域 + 反讽是已知短板**：实测「我为什么要高兴？你现在根本没时间陪我。」误判为 happiness（0.95）——训练数据是微博单帖，不含对话语境与反讽，字面「高兴」主导了判断。该案例已作为错误分析样本。
+3. **不能当对话情绪真值用**：中文模型的输出应视为"字面情绪倾向"参考，冲突预警启发式叠加在其上，两层都未经人工校准。

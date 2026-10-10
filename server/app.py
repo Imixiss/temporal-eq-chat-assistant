@@ -23,11 +23,13 @@ from src.utils.common import PROJECT_ROOT, load_config
 
 cfg = load_config()
 MODEL_PATH = PROJECT_ROOT / "outputs" / "checkpoints" / "erc_best_model.joblib"
+ZH_MODEL_DIR = PROJECT_ROOT / "outputs" / "checkpoints" / "erc_zh"
 NEG_EMOS = cfg["negative_emotions"]
 
 app = FastAPI(title="EQ Assistant Analysis Service")
 
 _model = None
+_zh = None  # (tokenizer, model, labels, device)
 
 
 def get_model():
@@ -35,6 +37,43 @@ def get_model():
     if _model is None:
         _model = joblib.load(MODEL_PATH)
     return _model
+
+
+def get_zh_model():
+    """惰性加载中文 RoBERTa 情绪模型（W3 微调，微博数据）。
+
+    注意：该模型在微博单帖上训练，逐轮对话场景属跨域应用，
+    且标签集不含 disgust——见 docs/experiment_log.md 的 W3 记录。
+    """
+    global _zh
+    if _zh is None:
+        import torch
+        from transformers import AutoModelForSequenceClassification, AutoTokenizer
+        labels = json.loads((ZH_MODEL_DIR / "label_map.json").read_text(encoding="utf-8"))["labels"]
+        tok = AutoTokenizer.from_pretrained(ZH_MODEL_DIR)
+        device = "mps" if torch.backends.mps.is_available() else "cpu"
+        mdl = AutoModelForSequenceClassification.from_pretrained(ZH_MODEL_DIR).to(device).eval()
+        _zh = (tok, mdl, labels, device)
+    return _zh
+
+
+def is_chinese(text: str) -> bool:
+    """按 CJK 字符占比粗判语言，决定走中文还是英文模型。"""
+    if not text:
+        return False
+    cjk = sum(1 for ch in text if "一" <= ch <= "鿿")
+    return cjk / len(text) > 0.2
+
+
+def predict_zh(text: str) -> tuple[str, float, dict]:
+    import torch
+    tok, mdl, labels, device = get_zh_model()
+    enc = tok(text, truncation=True, max_length=128, return_tensors="pt").to(device)
+    with torch.no_grad():
+        proba = torch.softmax(mdl(**enc).logits, dim=-1)[0].cpu().tolist()
+    probs = {l: round(float(p), 4) for l, p in zip(labels, proba)}
+    pred = labels[int(torch.tensor(proba).argmax())]
+    return pred, round(float(max(proba)), 4), probs
 
 
 class TurnIn(BaseModel):
@@ -122,23 +161,26 @@ def analyze(
     x_llm_base_url: str | None = Header(default=None),
     x_llm_model: str | None = Header(default=None),
 ):
-    m = get_model()
-    vec, clf = m["vectorizer"], m["clf"]
-    classes = list(m["classes"])
-
-    # 逐轮情绪识别
+    # 逐轮情绪识别：中文走 RoBERTa（W3），英文走 TF-IDF 基线 E1w
     turns = []
     for i, t in enumerate(body.turns):
-        X = vec.transform([t.text])  # 最佳模型 E1w 仅用当前轮文本
-        proba = clf.predict_proba(X)[0]
-        pred = clf.predict(X)[0]
+        if is_chinese(t.text):
+            pred, conf, probs = predict_zh(t.text)
+        else:
+            m = get_model()
+            vec, clf = m["vectorizer"], m["clf"]
+            X = vec.transform([t.text])  # 最佳模型 E1w 仅用当前轮文本
+            proba = clf.predict_proba(X)[0]
+            pred = clf.predict(X)[0]
+            conf = round(float(proba.max()), 4)
+            probs = {c: round(float(p), 4) for c, p in zip(m["classes"], proba)}
         turns.append({
             "turn_id": i,
             "speaker": t.speaker,
             "text": t.text,
             "emotion": pred,
-            "confidence": round(float(proba.max()), 4),
-            "probabilities": {c: round(float(p), 4) for c, p in zip(classes, proba)},
+            "confidence": conf,
+            "probabilities": probs,
         })
 
     # 时序指标 + 风险启发式
