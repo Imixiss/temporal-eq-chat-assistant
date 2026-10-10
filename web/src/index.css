@@ -130,3 +130,113 @@
 ::-webkit-scrollbar-thumb { background: rgba(190, 140, 90, .3); border-radius: 3px; }
 ::-webkit-scrollbar-thumb:hover { background: rgba(190, 140, 90, .5); }
 ::-webkit-scrollbar-track { background: transparent; }
+
+/* 加载骨架屏：暖色微光扫过 */
+.skeleton {
+  border-radius: var(--radius);
+  background: linear-gradient(100deg,
+    rgba(255, 240, 222, .6) 40%,
+    rgba(255, 214, 170, .85) 50%,
+    rgba(255, 240, 222, .6) 60%);
+  background-size: 200% 100%;
+  animation: shimmer 1.4s ease-in-out infinite;
+}
+@keyframes shimmer {
+  from { background-position: 120% 0; }
+  to   { background-position: -80% 0; }
+}
+
+/* 风险徽标呼吸光晕（中/高风险时提示注意力） */
+.pulse-glow { animation: badgePulse 2s ease-in-out infinite; }
+@keyframes badgePulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(217, 84, 77, .30); }
+  50%      { box-shadow: 0 0 0 7px rgba(217, 84, 77, 0); }
+}
+.pulse-glow-warm { animation: badgePulseWarm 2.4s ease-in-out infinite; }
+@keyframes badgePulseWarm {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(232, 131, 58, .28); }
+  50%      { box-shadow: 0 0 0 6px rgba(232, 131, 58, 0); }
+}
+
+/* 表格逐行浮现 */
+.row-in {
+  animation: rowIn .35s cubic-bezier(.22, .9, .3, 1) both;
+}
+@keyframes rowIn {
+  from { opacity: 0; transform: translateX(-6px); }
+  to   { opacity: 1; transform: translateX(0); }
+}
+
+/* 按钮里的三点加载 */
+.loading-dots { display: inline-flex; gap: 4px; align-items: center; margin-left: 6px; }
+.loading-dots i {
+  width: 5px; height: 5px; border-radius: 50%;
+  background: currentColor; opacity: .6;
+  animation: dotBounce 1s ease-in-out infinite;
+}
+.loading-dots i:nth-child(2) { animation-delay: .15s; }
+.loading-dots i:nth-child(3) { animation-delay: .3s; }
+@keyframes dotBounce {
+  0%, 60%, 100% { transform: translateY(0); opacity: .5; }
+  30% { transform: translateY(-4px); opacity: 1; }
+}
+
+/* 品牌光点缓慢呼吸 */
+.brand-dot { animation: dotBreath 3s ease-in-out infinite; }
+@keyframes dotBreath {
+  0%, 100% { box-shadow: 0 0 6px rgba(232, 131, 58, .45); }
+  50%      { box-shadow: 0 0 14px rgba(232, 131, 58, .8); }
+}
+
+/* 指标数字弹出 */
+.num-pop { display: inline-block; animation: numPop .45s cubic-bezier(.34, 1.56, .64, 1) both; }
+@keyframes numPop {
+  from { opacity: 0; transform: scale(.6); }
+  to   { opacity: 1; transform: scale(1); }
+}
+
+/* 点击按钮溅射气泡粒子 */
+.burst-bubble {
+  position: fixed;
+  border-radius: 50%;
+  pointer-events: none;
+  z-index: 60;
+  background: radial-gradient(circle at 30% 30%, #FFC98A, #E8833A);
+  box-shadow: 0 0 6px rgba(232, 131, 58, .5);
+  animation: bubbleFly .65s cubic-bezier(.22, .9, .3, 1) forwards;
+}
+@keyframes bubbleFly {
+  0%   { transform: translate(0, 0) scale(1); opacity: 1; }
+  100% { transform: translate(var(--dx), var(--dy)) scale(.15); opacity: 0; }
+}
+
+/* 分阶段进度条 */
+.progress-track {
+  height: 8px;
+  border-radius: 999px;
+  background: rgba(232, 131, 58, .12);
+  overflow: hidden;
+}
+.progress-fill {
+  height: 100%;
+  border-radius: 999px;
+  background: linear-gradient(90deg, #F0A05C, #E8833A);
+  box-shadow: 0 0 8px rgba(232, 131, 58, .4);
+  transition: width .6s cubic-bezier(.22, .9, .3, 1);
+  position: relative;
+}
+.progress-fill::after {
+  content: "";
+  position: absolute; inset: 0;
+  background: linear-gradient(100deg, transparent 30%, rgba(255,255,255,.45) 50%, transparent 70%);
+  background-size: 200% 100%;
+  animation: shimmer 1.2s linear infinite;
+}
+
+/* 尊重系统减少动效设置 */
+@media (prefers-reduced-motion: reduce) {
+  .bg-aurora, .rise-in, .row-in, .num-pop, .pulse-glow, .pulse-glow-warm, .brand-dot, .skeleton,
+  .burst-bubble, .progress-fill::after {
+    animation: none !important;
+  }
+}

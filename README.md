@@ -40,6 +40,12 @@ cd web && npm run dev
 
 后端未启动时前端自动进入演示模式（有明确提示）。
 
+## 输入方式
+
+- **直接粘贴**：支持微信/QQ 复制出来的「昵称 + 时间戳」格式（自动识别双方昵称，多行消息自动合并）
+- **上传截图**：📷 按钮上传聊天截图，调用 macOS Vision 框架在**本机离线**识别文字（图片不出本机；仅 macOS 可用，识别结果先填入输入框由你确认再分析）
+- **手动格式**：`A: 消息` / `B：消息`，不带前缀则按 A/B 交替
+
 ## 接入大模型（建议/回复生成层）
 
 两选一：
@@ -65,9 +71,9 @@ PYTHONPATH=. python -m src.models.train_erc_zh --epochs 3 # 正式训练（约 1
 
 ```
 configs/            全部超参、标签映射、LLM 配置模板
-scripts/            download_assets.py（一键下载数据+模型）
+scripts/            download_assets.py（一键下载数据+模型）、ocr.swift（macOS Vision 截图识别）
 src/                预处理 / 统计 / 基线 / 中文模型 / 趋势 / 预警
-server/             FastAPI 分析服务（分析接口 + LLM 代理）
+server/             FastAPI 分析服务（分析接口 + OCR + LLM 代理）
 web/                React + Vite + Tailwind + shadcn/ui 前端
 docs/               范围定义、数据集文档、实验记录、错误分析、W3-W4 计划、改进点子
 data/ models/ outputs/  （gitignore，由脚本生成）
