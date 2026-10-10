@@ -1,10 +1,11 @@
-"""分析服务：POST /api/analyze
+"""分析服务：POST /api/analyze + POST /api/ocr
 
 职责：
-1. 加载 ERC 最佳模型（outputs/checkpoints/erc_best_model.joblib），逐轮输出情绪标签+概率；
+1. 逐轮情绪识别：中文走 RoBERTa（outputs/checkpoints/erc_zh），英文走 TF-IDF 基线；
 2. 计算时序指标与冲突风险启发式（规则未验证，见 conflict_heuristic.py 声明）；
 3. 若请求头或 configs/llm.yaml 提供了 LLM 配置，则代理调用 OpenAI 兼容接口，
    生成局势分析/沟通建议/回复草稿；否则 suggestions=null, llm_status="not_configured"。
+4. /api/ocr：调用 scripts/ocr.swift（macOS Vision）本机离线识别聊天截图。
 
 启动：PYTHONPATH=. uvicorn server.app:app --port 8000
 """
@@ -14,7 +15,7 @@ from pathlib import Path
 import joblib
 import requests
 import yaml
-from fastapi import FastAPI, Header
+from fastapi import FastAPI, Header, Request
 from pydantic import BaseModel
 
 from src.analysis.conflict_heuristic import assess
@@ -152,6 +153,46 @@ def health():
         "model_loaded": MODEL_PATH.exists(),
         "llm_configured_in_file": bool(llm_file.get("api_key")),
     }
+
+
+OCR_SCRIPT = PROJECT_ROOT / "scripts" / "ocr.swift"
+
+
+@app.post("/api/ocr")
+async def ocr(request: Request):
+    """聊天截图 → 文字。调用 macOS Vision 框架（本地离线识别，图片不出本机）。
+
+    前端以原始字节 POST（Content-Type: image/*），避免依赖 python-multipart。
+    仅在 macOS 上可用；返回 lines 供前端填入输入框，由用户确认后再分析。
+    """
+    import subprocess
+    import tempfile
+
+    if not OCR_SCRIPT.exists():
+        return {"ok": False, "lines": [], "message": "OCR 脚本缺失：scripts/ocr.swift"}
+    data = await request.body()
+    if not data:
+        return {"ok": False, "lines": [], "message": "未收到图片数据"}
+    ctype = request.headers.get("content-type", "image/png")
+    suffix = ".jpg" if "jpeg" in ctype else ".png"
+    with tempfile.NamedTemporaryFile(suffix=suffix, delete=False) as tmp:
+        tmp.write(data)
+        tmp_path = tmp.name
+    try:
+        proc = subprocess.run(
+            ["swift", str(OCR_SCRIPT), tmp_path],
+            capture_output=True, text=True, timeout=120,
+        )
+        if proc.returncode != 0:
+            return {"ok": False, "lines": [], "message": f"识别失败：{proc.stderr.strip()[:200]}"}
+        lines = [l.strip() for l in proc.stdout.splitlines() if l.strip()]
+        if not lines:
+            return {"ok": False, "lines": [], "message": "没有识别到文字，请换一张更清晰的截图"}
+        return {"ok": True, "lines": lines, "message": None}
+    except subprocess.TimeoutExpired:
+        return {"ok": False, "lines": [], "message": "识别超时"}
+    finally:
+        Path(tmp_path).unlink(missing_ok=True)
 
 
 @app.post("/api/analyze")
