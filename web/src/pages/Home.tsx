@@ -41,11 +41,12 @@ export default function Home() {
   const onSaveSettings = (s: LlmSettings) => { setLlm(s); saveLlmSettings(s) }
 
   return (
-    <div className="min-h-screen bg-[#FAFAF7]">
-      <header className="border-b bg-white/80 backdrop-blur sticky top-0 z-10">
+    <div className="warm-page">
+      <div className="bg-aurora" />
+      <header className="warm-content border-b border-[rgba(190,140,90,.16)] bg-[rgba(255,253,250,.75)] backdrop-blur sticky top-0 z-10">
         <div className="max-w-6xl mx-auto px-4 py-3 flex items-center justify-between">
           <div>
-            <h1 className="text-lg font-semibold">时序感知高情商聊天助手</h1>
+            <h1 className="text-lg font-semibold"><span className="brand-dot" />时序感知高情商聊天助手</h1>
             <p className="text-xs text-muted-foreground">读懂整段对话的情绪走向，再帮你回下一句</p>
           </div>
           <div className="flex items-center gap-2">
@@ -57,9 +58,9 @@ export default function Home() {
         </div>
       </header>
 
-      <main className="max-w-6xl mx-auto px-4 py-6 space-y-6">
+      <main className="warm-content max-w-6xl mx-auto px-4 py-6 space-y-6">
         {/* 输入区 */}
-        <Card>
+        <Card className="warm-card rise-in">
           <CardHeader><CardTitle className="text-base">📥 粘贴聊天记录</CardTitle></CardHeader>
           <CardContent className="space-y-3">
             <Textarea
@@ -69,7 +70,7 @@ export default function Home() {
               onChange={(e) => setInput(e.target.value)}
             />
             <div className="flex gap-2">
-              <Button onClick={run} disabled={loading}>{loading ? '分析中…' : '开始分析'}</Button>
+              <Button onClick={run} disabled={loading} className="btn-warm border-0">{loading ? '分析中…' : '开始分析'}</Button>
               <Button variant="outline" onClick={() => setInput(DEMO_INPUT)}>载入示例</Button>
             </div>
             {error && <p className="text-sm text-red-600">{error}</p>}
@@ -86,32 +87,32 @@ export default function Home() {
           <>
             {/* 趋势总览 */}
             <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
-              <Card><CardContent className="pt-4 text-center">
+              <Card className="warm-card rise-in"><CardContent className="pt-4 text-center">
                 <div className={`inline-block rounded-full px-3 py-1 text-sm font-medium ${RISK_COLOR[result.risk.conflict_risk]}`}>
                   {RISK_ZH[result.risk.conflict_risk]}
                 </div>
                 <p className="text-xs text-muted-foreground mt-2">冲突风险（启发式，待校准）</p>
               </CardContent></Card>
-              <Card><CardContent className="pt-4 text-center">
+              <Card className="warm-card rise-in"><CardContent className="pt-4 text-center">
                 <div className="text-xl font-semibold">{TREND_ZH[result.risk.trend]}</div>
                 <p className="text-xs text-muted-foreground mt-1">情绪趋势</p>
               </CardContent></Card>
-              <Card><CardContent className="pt-4 text-center">
+              <Card className="warm-card rise-in"><CardContent className="pt-4 text-center">
                 <div className="text-xl font-semibold">{result.metrics.polarity_flips}</div>
                 <p className="text-xs text-muted-foreground mt-1">情绪翻转次数</p>
               </CardContent></Card>
-              <Card><CardContent className="pt-4 text-center">
+              <Card className="warm-card rise-in"><CardContent className="pt-4 text-center">
                 <div className="text-xl font-semibold">{result.metrics.max_negative_streak}</div>
                 <p className="text-xs text-muted-foreground mt-1">最长连续负向轮数</p>
               </CardContent></Card>
-              <Card><CardContent className="pt-4 text-center">
+              <Card className="warm-card rise-in"><CardContent className="pt-4 text-center">
                 <div className="text-xl font-semibold">{result.metrics.volatility.toFixed(2)}</div>
                 <p className="text-xs text-muted-foreground mt-1">情绪波动幅度</p>
               </CardContent></Card>
             </div>
 
             {/* 情绪时间线 */}
-            <Card>
+            <Card className="warm-card rise-in" style={{ animationDelay: '.08s' }}>
               <CardHeader><CardTitle className="text-base">📈 情绪时间线</CardTitle></CardHeader>
               <CardContent>
                 <EmotionTimeline turns={result.turns} />
@@ -123,7 +124,7 @@ export default function Home() {
 
             <div className="grid md:grid-cols-2 gap-4 items-start">
               {/* 逐轮明细 */}
-              <Card>
+              <Card className="warm-card rise-in" style={{ animationDelay: '.14s' }}>
                 <CardHeader><CardTitle className="text-base">🔎 逐轮情绪明细</CardTitle></CardHeader>
                 <CardContent>
                   <Table>

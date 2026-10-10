@@ -2,66 +2,39 @@
 @tailwind components;
 @tailwind utilities;
 
+/* ============================================================
+   暖色治愈风 Design Tokens（参考「暖屿」配色思路）
+   ============================================================ */
 @layer base {
   :root {
-    --background: 0 0% 100%;
-    --foreground: 240 10% 3.9%;
-    --card: 0 0% 100%;
-    --card-foreground: 240 10% 3.9%;
-    --popover: 0 0% 100%;
-    --popover-foreground: 240 10% 3.9%;
-    --primary: 240 5.9% 10%;
-    --primary-foreground: 0 0% 98%;
-    --secondary: 240 4.8% 95.9%;
-    --secondary-foreground: 240 5.9% 10%;
-    --muted: 240 4.8% 95.9%;
-    --muted-foreground: 240 3.8% 46.1%;
-    --accent: 240 4.8% 95.9%;
-    --accent-foreground: 240 5.9% 10%;
-    --destructive: 0 84.2% 60.2%;
+    --background: 34 100% 97%;          /* #FFF9F2 暖米白 */
+    --foreground: 26 29% 22%;           /* #4A3628 暖褐墨 */
+    --card: 36 100% 99%;                /* #FFFDFA */
+    --card-foreground: 26 29% 22%;
+    --popover: 36 100% 99%;
+    --popover-foreground: 26 29% 22%;
+    --primary: 27 79% 57%;              /* #E8833A 暖橙 */
+    --primary-foreground: 0 0% 100%;
+    --secondary: 28 60% 93%;
+    --secondary-foreground: 24 55% 35%;
+    --muted: 30 45% 94%;
+    --muted-foreground: 27 16% 53%;     /* #9B8574 */
+    --accent: 28 85% 89%;               /* #FBE3CC */
+    --accent-foreground: 24 58% 32%;
+    --destructive: 0 72% 55%;
     --destructive-foreground: 0 0% 98%;
-    --border: 240 5.9% 90%;
-    --input: 240 5.9% 90%;
-    --ring: 240 5.9% 10%;
-    --radius: 0.625rem;
-    --sidebar-background: 0 0% 98%;
-    --sidebar-foreground: 240 5.3% 26.1%;
-    --sidebar-primary: 240 5.9% 10%;
-    --sidebar-primary-foreground: 0 0% 98%;
-    --sidebar-accent: 240 4.8% 95.9%;
-    --sidebar-accent-foreground: 240 5.9% 10%;
-    --sidebar-border: 220 13% 91%;
-    --sidebar-ring: 217.2 91.2% 59.8%;
-  }
-
-  .dark {
-    --background: 240 10% 3.9%;
-    --foreground: 0 0% 98%;
-    --card: 240 10% 3.9%;
-    --card-foreground: 0 0% 98%;
-    --popover: 240 10% 3.9%;
-    --popover-foreground: 0 0% 98%;
-    --primary: 0 0% 98%;
-    --primary-foreground: 240 5.9% 10%;
-    --secondary: 240 3.7% 15.9%;
-    --secondary-foreground: 0 0% 98%;
-    --muted: 240 3.7% 15.9%;
-    --muted-foreground: 240 5% 64.9%;
-    --accent: 240 3.7% 15.9%;
-    --accent-foreground: 0 0% 98%;
-    --destructive: 0 62.8% 30.6%;
-    --destructive-foreground: 0 0% 98%;
-    --border: 240 3.7% 15.9%;
-    --input: 240 3.7% 15.9%;
-    --ring: 240 4.9% 83.9%;
-    --sidebar-background: 240 5.9% 10%;
-    --sidebar-foreground: 240 4.8% 95.9%;
-    --sidebar-primary: 224.3 76.3% 48%;
+    --border: 29 45% 88%;
+    --input: 29 45% 85%;
+    --ring: 27 79% 57%;
+    --radius: 0.875rem;
+    --sidebar-background: 34 100% 97%;
+    --sidebar-foreground: 26 29% 22%;
+    --sidebar-primary: 27 79% 57%;
     --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 240 3.7% 15.9%;
-    --sidebar-accent-foreground: 240 4.8% 95.9%;
-    --sidebar-border: 240 3.7% 15.9%;
-    --sidebar-ring: 217.2 91.2% 59.8%;
+    --sidebar-accent: 28 85% 89%;
+    --sidebar-accent-foreground: 24 58% 32%;
+    --sidebar-border: 29 45% 88%;
+    --sidebar-ring: 27 79% 57%;
   }
 }
 
@@ -71,5 +44,89 @@
   }
   body {
     @apply bg-background text-foreground;
+    font-family: "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", -apple-system, "Helvetica Neue", sans-serif;
   }
 }
+
+/* ============================================================
+   氛围与动效
+   ============================================================ */
+
+/* 页面背景：暖色渐变 + 漂浮光斑 */
+.warm-page {
+  position: relative;
+  background: linear-gradient(135deg, #FFF6EA 0%, #FFEED9 50%, #F9E8D4 100%);
+  min-height: 100vh;
+}
+
+.bg-aurora {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 0;
+  background:
+    radial-gradient(480px 480px at 10% 15%, rgba(255, 190, 120, .30), transparent 70%),
+    radial-gradient(560px 560px at 90% 10%, rgba(255, 160, 140, .24), transparent 70%),
+    radial-gradient(520px 520px at 82% 90%, rgba(255, 205, 150, .28), transparent 70%),
+    radial-gradient(420px 420px at 6% 88%, rgba(240, 160, 90, .20), transparent 70%);
+  animation: auroraDrift 18s ease-in-out infinite alternate;
+}
+
+@keyframes auroraDrift {
+  from { transform: translate3d(0, 0, 0) scale(1); }
+  to   { transform: translate3d(0, -14px, 0) scale(1.04); }
+}
+
+/* 内容层压过光斑 */
+.warm-content { position: relative; z-index: 1; }
+
+/* 暖色卡片：柔边 + 暖色软阴影 + 悬停浮起 */
+.warm-card {
+  background: rgba(255, 253, 250, .85);
+  backdrop-filter: blur(6px);
+  border: 1px solid rgba(190, 140, 90, .16);
+  box-shadow: 0 4px 16px rgba(184, 110, 50, .08);
+  transition: box-shadow .25s, transform .25s, border-color .25s;
+}
+.warm-card:hover {
+  box-shadow: 0 10px 28px rgba(184, 110, 50, .14);
+  border-color: rgba(190, 140, 90, .3);
+}
+
+/* 结果区入场动画（逐张卡片错峰浮现） */
+.rise-in {
+  animation: riseIn .5s cubic-bezier(.22, .9, .3, 1) both;
+}
+@keyframes riseIn {
+  from { opacity: 0; transform: translateY(10px) scale(.98); }
+  to   { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+/* 暖橙渐变主按钮 */
+.btn-warm {
+  background: linear-gradient(140deg, #F0A05C, #E8833A);
+  color: #fff;
+  box-shadow: 0 4px 12px rgba(232, 131, 58, .35);
+  transition: transform .2s, box-shadow .2s, opacity .2s;
+}
+.btn-warm:hover:not(:disabled) {
+  transform: translateY(-1px);
+  box-shadow: 0 8px 20px rgba(232, 131, 58, .42);
+}
+.btn-warm:disabled { opacity: .5; box-shadow: none; }
+
+/* 品牌光点 */
+.brand-dot {
+  display: inline-block;
+  width: 10px; height: 10px; border-radius: 50%;
+  background: radial-gradient(circle at 30% 30%, #FFC98A, #E8833A);
+  box-shadow: 0 0 8px rgba(232, 131, 58, .6);
+  margin-right: 8px;
+  vertical-align: 1px;
+}
+
+/* 暖色滚动条 */
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-thumb { background: rgba(190, 140, 90, .3); border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: rgba(190, 140, 90, .5); }
+::-webkit-scrollbar-track { background: transparent; }

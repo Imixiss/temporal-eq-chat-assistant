@@ -10,7 +10,7 @@ interface Props {
 export default function SuggestionsPanel({ suggestions, llmStatus, llmMessage }: Props) {
   if (!suggestions) {
     return (
-      <Card className="border-dashed">
+      <Card className="warm-card border-dashed">
         <CardHeader><CardTitle className="text-base">💬 分析与回复建议</CardTitle></CardHeader>
         <CardContent className="text-sm text-muted-foreground space-y-2">
           {llmStatus === 'error' ? (
@@ -32,11 +32,11 @@ export default function SuggestionsPanel({ suggestions, llmStatus, llmMessage }:
 
   return (
     <div className="space-y-4">
-      <Card>
+      <Card className="warm-card rise-in">
         <CardHeader><CardTitle className="text-base">🔍 局势分析</CardTitle></CardHeader>
         <CardContent className="text-sm whitespace-pre-wrap">{suggestions.situation_analysis}</CardContent>
       </Card>
-      <Card>
+      <Card className="warm-card rise-in" style={{ animationDelay: '.08s' }}>
         <CardHeader><CardTitle className="text-base">🧭 沟通建议</CardTitle></CardHeader>
         <CardContent>
           <ul className="list-disc pl-5 text-sm space-y-1">
@@ -44,13 +44,13 @@ export default function SuggestionsPanel({ suggestions, llmStatus, llmMessage }:
           </ul>
         </CardContent>
       </Card>
-      <Card>
+      <Card className="warm-card rise-in" style={{ animationDelay: '.16s' }}>
         <CardHeader><CardTitle className="text-base">✉️ 回复草稿（点击复制）</CardTitle></CardHeader>
         <CardContent className="space-y-3">
           {suggestions.reply_drafts.map((d, i) => (
             <button
               key={i}
-              className="block w-full text-left rounded-lg border p-3 hover:bg-accent transition"
+              className="block w-full text-left rounded-xl border border-[rgba(190,140,90,.25)] bg-white/60 p-3 hover:bg-[#FBE3CC]/60 hover:-translate-y-0.5 hover:shadow-[0_8px_20px_rgba(184,110,50,.14)] transition-all"
               onClick={() => navigator.clipboard.writeText(d.text)}
             >
               <span className="text-xs font-medium text-muted-foreground">{d.style}</span>
