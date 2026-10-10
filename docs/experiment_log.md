@@ -47,3 +47,11 @@ fear/disgust 样本太少（test 各 17/47 条），指标不稳定，解释时�
 - TF-IDF 无法处理讽刺、隐含情绪；错误分析待人工复核（`docs/error_analysis.md`）
 - 预训练模型（BERT 类）基线未做：当前环境未装 transformers，作为 W3 的可选增强，不阻塞主流程
 - 趋势分数映射是展示用启发式，不是心理学情绪强度
+
+## LLM 联调记录（2026-10-10）
+
+- 模型：kimi-k3（Moonshot AI）。该账号可用模型列表为 kimi-k2.7-code / kimi-k2.6 / kimi-k3 / kimi-k2.7-code-highspeed，旧名 moonshot-v1-8k 已 404。
+- 接口限制（实测）：kimi-k3 仅允许 temperature=1，不支持 response_format=json_object；输出常带 ```json 围栏。
+- 对应修改：server/app.py 移除 temperature / response_format 参数，新增 parse_llm_json() 容错解析（去围栏 + 截取首个 {...} 片段）；前端与示例配置默认模型名统一改为 kimi-k3。
+- 端到端验证：POST /api/analyze 输入 4 轮中文对话（升职/陪伴冲突场景），llm_status=ok，返回局势分析、5 条建议、3 条不同风格回复草稿，内容合理且正确识别了情绪模型的误判。
+- 已知局限（不变）：英文 ERC 模型对中文全部输出 no_emotion（W3 中文模型解决）；冲突预警仍为未验证启发式。

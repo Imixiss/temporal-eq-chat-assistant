@@ -3,5 +3,5 @@
 # llm.yaml 已在 .gitignore 中，不会上传 GitHub。
 provider: kimi
 base_url: https://api.moonshot.cn/v1
-model: moonshot-v1-8k
+model: kimi-k3
 api_key: ""  # 填入你的 sk-...

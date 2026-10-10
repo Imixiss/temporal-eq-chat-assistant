@@ -83,14 +83,26 @@ def call_llm(turns: list[dict], key: str, base_url: str, model: str) -> dict:
                 {"role": "system", "content": LLM_SYSTEM_PROMPT},
                 {"role": "user", "content": f"对话及情绪识别结果：\n{timeline}"},
             ],
-            "temperature": 0.7,
-            "response_format": {"type": "json_object"},
+            # 注意：kimi-k3 等模型仅允许 temperature=1，且不支持 response_format，
+            # 如需这两个参数请先确认模型支持
         },
         timeout=60,
     )
     resp.raise_for_status()
     content = resp.json()["choices"][0]["message"]["content"]
-    return json.loads(content)
+    return parse_llm_json(content)
+
+
+def parse_llm_json(content: str) -> dict:
+    """容错解析：去掉 ```json 围栏，截取首个 { 到末尾 } 的片段。"""
+    import re
+    s = content.strip()
+    s = re.sub(r"^```(?:json)?\s*|\s*```$", "", s, flags=re.S).strip()
+    if not s.startswith("{"):
+        m = re.search(r"\{.*\}", s, flags=re.S)
+        if m:
+            s = m.group(0)
+    return json.loads(s)
 
 
 @app.get("/api/health")
@@ -141,7 +153,7 @@ def analyze(
     file_cfg = load_llm_file_config()
     key = x_llm_key or file_cfg.get("api_key")
     base_url = x_llm_base_url or file_cfg.get("base_url", "https://api.moonshot.cn/v1")
-    model_name = x_llm_model or file_cfg.get("model", "moonshot-v1-8k")
+    model_name = x_llm_model or file_cfg.get("model", "kimi-k3")
 
     suggestions = None
     llm_status = "not_configured"
