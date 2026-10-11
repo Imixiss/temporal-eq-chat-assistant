@@ -1,12 +1,10 @@
-"""分析服务：POST /api/analyze + POST /api/ocr + GET /api/usage
+"""分析服务：POST /api/analyze
 
 职责：
-1. 逐轮情绪识别：中文走 RoBERTa（outputs/checkpoints/erc_zh），英文走 TF-IDF 基线；
+1. 加载 ERC 最佳模型（outputs/checkpoints/erc_best_model.joblib），逐轮输出情绪标签+概率；
 2. 计算时序指标与冲突风险启发式（规则未验证，见 conflict_heuristic.py 声明）；
 3. 若请求头或 configs/llm.yaml 提供了 LLM 配置，则代理调用 OpenAI 兼容接口，
    生成局势分析/沟通建议/回复草稿；否则 suggestions=null, llm_status="not_configured"。
-4. /api/ocr：调用 scripts/ocr.swift（macOS Vision）本机离线识别聊天截图。
-5. 用量监控：每次成功调用记入 outputs/llm_usage.jsonl，达到 budget_yuan 后熔断。
 
 启动：PYTHONPATH=. uvicorn server.app:app --port 8000
 """
@@ -117,20 +115,30 @@ def call_llm(turns: list[dict], key: str, base_url: str, model: str,
         f"{i+1}. [{t['speaker']}] {t['text']}  （情绪: {t['emotion']}, 置信度 {t['confidence']:.2f}）"
         for i, t in enumerate(turns)
     )
-    resp = requests.post(
-        f"{base_url.rstrip('/')}/chat/completions",
-        headers={"Authorization": f"Bearer {key}", "Content-Type": "application/json"},
-        json={
-            "model": model,
-            "messages": [
-                {"role": "system", "content": LLM_SYSTEM_PROMPT},
-                {"role": "user", "content": f"对话及情绪识别结果：\n{timeline}"},
-            ],
-            # 注意：kimi-k3 等模型仅允许 temperature=1，且不支持 response_format，
-            # 如需这两个参数请先确认模型支持
-        },
-        timeout=60,
-    )
+    payload = {
+        "model": model,
+        "messages": [
+            {"role": "system", "content": LLM_SYSTEM_PROMPT},
+            {"role": "user", "content": f"对话及情绪识别结果：\n{timeline}"},
+        ],
+        # 注意：kimi-k3 等模型仅允许 temperature=1，且不支持 response_format，
+        # 如需这两个参数请先确认模型支持
+    }
+    headers = {"Authorization": f"Bearer {key}", "Content-Type": "application/json"}
+    url = f"{base_url.rstrip('/')}/chat/completions"
+    # kimi-k3 生成结构化长文常超过 60s，放宽读取超时；超时后自动重试一次
+    resp = None
+    last_err: Exception | None = None
+    for attempt in range(2):
+        try:
+            resp = requests.post(url, headers=headers, json=payload, timeout=(10, 180))
+            break
+        except requests.exceptions.ReadTimeout as e:
+            last_err = e
+            if attempt == 0:
+                time.sleep(3)
+    if resp is None:
+        raise last_err  # type: ignore[misc]
     resp.raise_for_status()
     data = resp.json()
     if data.get("usage"):
