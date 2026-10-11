@@ -1,4 +1,4 @@
-import type { AnalyzeResponse, LlmSettings, TurnInput } from '@/types'
+import type { AnalyzeResponse, LlmSettings, TurnInput, UsageStats } from '@/types'
 
 /** 说话人昵称映射：先出现的非"我"昵称视为对方（B），"我"/A 视为自己（A） */
 function makeSpeakerMapper() {
@@ -103,6 +103,17 @@ export async function ocrImage(file: File): Promise<OcrResponse> {
   })
   if (!resp.ok) throw new Error(`识别服务返回 ${resp.status}`)
   return (await resp.json()) as OcrResponse
+}
+
+/** 查询大模型累计用量与预算（本地账本估算，实际扣费以平台控制台为准） */
+export async function getUsage(): Promise<UsageStats | null> {
+  try {
+    const resp = await fetch('/api/usage')
+    if (!resp.ok) return null
+    return (await resp.json()) as UsageStats
+  } catch {
+    return null
+  }
 }
 
 /** 后端未启动时的演示数据（前端明确标注为演示） */

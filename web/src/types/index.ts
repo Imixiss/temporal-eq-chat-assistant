@@ -42,8 +42,16 @@ export interface AnalyzeResponse {
   metrics: TemporalMetrics
   risk: RiskAssessment
   suggestions: Suggestions | null
-  llm_status: 'ok' | 'not_configured' | 'error'
+  llm_status: 'ok' | 'not_configured' | 'error' | 'budget_exceeded'
   llm_message?: string
+}
+
+export interface UsageStats {
+  calls: number
+  prompt_tokens: number
+  completion_tokens: number
+  cost_yuan: number
+  budget_yuan: number
 }
 
 export interface LlmSettings {

@@ -3,7 +3,7 @@ import type { Suggestions } from '@/types'
 
 interface Props {
   suggestions: Suggestions | null
-  llmStatus: 'ok' | 'not_configured' | 'error'
+  llmStatus: 'ok' | 'not_configured' | 'error' | 'budget_exceeded'
   llmMessage?: string
 }
 
@@ -15,6 +15,8 @@ export default function SuggestionsPanel({ suggestions, llmStatus, llmMessage }:
         <CardContent className="text-sm text-muted-foreground space-y-2">
           {llmStatus === 'error' ? (
             <p className="text-red-600">大模型调用失败：{llmMessage}</p>
+          ) : llmStatus === 'budget_exceeded' ? (
+            <p className="text-amber-700">💰 {llmMessage}</p>
           ) : (
             <>
               <p>此区域由大模型驱动，目前尚未接入。点击右上角「⚙ 大模型设置」填入 API Key 后，这里会输出：</p>

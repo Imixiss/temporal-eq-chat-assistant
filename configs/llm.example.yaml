@@ -5,3 +5,8 @@ provider: kimi
 base_url: https://api.moonshot.cn/v1
 model: kimi-k3
 api_key: ""  # 填入你的 sk-...
+
+# 用量与预算（可选）：单价单位为元/百万 tokens，默认值为 kimi-k3 中国站官方价（2026-10）
+# price_in_per_million: 20.0
+# price_out_per_million: 100.0
+# budget_yuan: 1.5   # 达到预算后自动跳过大模型调用
