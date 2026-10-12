@@ -310,7 +310,7 @@ export default function Home() {
                     <span aria-hidden>{RISK_ICON[result.risk.conflict_risk]}</span>{RISK_ZH[result.risk.conflict_risk]}
                   </span>
                   <div className="text-[40px] font-bold num-pop">{RISK_LEVEL[result.risk.conflict_risk]}</div>
-                  <p className="text-[13px] text-muted-foreground">由情绪趋势启发式规则估算，阈值未经人工校准，仅供参考{result.risk.note ? `：${result.risk.note}` : ''}</p>
+                  <p className="text-[13px] text-muted-foreground">由情绪趋势启发式规则估算，阈值未经人工校准，仅供参考</p>
                 </CardContent>
               </Card>
 
