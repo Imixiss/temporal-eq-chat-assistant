@@ -1,0 +1,557 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>时序感知高情商聊天助手 · 视觉重设计稿</title>
+<style>
+/* ===================== 【1】Design Tokens ===================== */
+:root {
+  /* 色彩 */
+  --bg: #FFF7ED;            /* 页面背景：米橙 */
+  --card: #FFFFFF;
+  --primary: #F97316;       /* 主色橙 */
+  --primary-hover: #EA580C;
+  --primary-active: #C2410C;
+  --text: #1F2937;          /* 正文 */
+  --muted: #6B7280;         /* 次要文字（在米橙底上对比度 > 4.5:1） */
+  --line: #F0E4D4;          /* 卡片内分隔线 */
+  /* 风险色：浅底 + 深字 + 图标 */
+  --risk-low-bg: #DCFCE7;  --risk-low-text: #15803D;
+  --risk-mid-bg: #FEF3C7;  --risk-mid-text: #92400E;
+  --risk-high-bg: #FEE2E2; --risk-high-text: #B91C1C;
+  /* 圆角 / 阴影（8px 栅格） */
+  --radius-card: 16px;
+  --radius-ctl: 12px;
+  --shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+  --shadow-hover: 0 6px 16px rgba(0, 0, 0, 0.10);
+  /* 字号层级 */
+  --fs-title: 24px;  --fw-title: 700;
+  --fs-card-title: 16px; --fw-card-title: 600;
+  --fs-metric: 32px; --fw-metric: 700;
+  --fs-body: 14px;
+  --fs-caption: 13px;
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+/* 修正：作者样式的 display 会覆盖 hidden 属性的默认隐藏，必须显式声明 */
+[hidden] { display: none !important; }
+#resultsContent:not([hidden]) { display: contents; }
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+  font-size: var(--fs-body);
+  line-height: 1.6;
+}
+
+/* 【6】键盘聚焦：2px 橙色描边，不去掉 outline */
+:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+/* ===================== 【2】整体框架 ===================== */
+.wrap {
+  max-width: 1120px;
+  margin: 0 auto;
+  padding: 0 24px;
+}
+
+/* 顶部栏 64px：左应用名 / 中留白 / 右额度+状态+设置 */
+.topbar {
+  height: 64px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+.brand h1 { font-size: var(--fs-title); font-weight: var(--fw-title); line-height: 1.2; }
+.brand p { font-size: var(--fs-caption); color: var(--muted); }
+
+.topbar-right { display: flex; align-items: center; gap: 16px; }
+
+/* 额度进度条 */
+.usage { display: flex; flex-direction: column; gap: 4px; min-width: 160px; }
+.usage-label { font-size: 12px; color: var(--muted); white-space: nowrap; }
+.usage-track { height: 6px; border-radius: 3px; background: #FDE8D3; overflow: hidden; }
+.usage-fill { height: 100%; width: 12.7%; background: var(--primary); border-radius: 3px; }
+
+/* “已接入”状态点标签 */
+.status-pill {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 4px 12px; border-radius: 999px;
+  background: var(--risk-low-bg); color: var(--risk-low-text);
+  font-size: 12px; font-weight: 600; white-space: nowrap;
+}
+.status-dot { width: 8px; height: 8px; border-radius: 50%; background: #22C55E; }
+
+/* 设置图标按钮 */
+.icon-btn {
+  width: 40px; height: 40px; border-radius: var(--radius-ctl);
+  border: 1px solid var(--line); background: var(--card);
+  display: inline-flex; align-items: center; justify-content: center;
+  cursor: pointer; color: var(--muted);
+  transition: box-shadow 150ms, transform 150ms;
+}
+.icon-btn:hover { box-shadow: var(--shadow-hover); color: var(--text); }
+
+/* 主区域：桌面端左右两栏（5/12 + 7/12），左栏 sticky */
+.main {
+  display: grid;
+  grid-template-columns: 5fr 7fr;
+  gap: 24px;
+  padding: 24px 0 48px;
+  align-items: start;
+}
+.col-input { position: sticky; top: 24px; }
+
+/* ===================== 通用卡片 ===================== */
+.card {
+  background: var(--card);
+  border-radius: var(--radius-card);
+  box-shadow: var(--shadow);
+  padding: 24px;               /* 卡片内边距 24px */
+  transition: box-shadow 150ms, transform 150ms;
+}
+.card:hover { box-shadow: var(--shadow-hover); transform: translateY(-2px); }
+.card-title { font-size: var(--fs-card-title); font-weight: var(--fw-card-title); margin-bottom: 4px; }
+.card-hint { font-size: var(--fs-caption); color: var(--muted); margin-bottom: 16px; }
+
+/* ===================== 【3】输入卡片 ===================== */
+.chat-input {
+  width: 100%;
+  min-height: 220px;
+  resize: vertical;
+  padding: 16px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-ctl);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 13px;
+  line-height: 1.6;
+  color: var(--text);
+  background: #FFFCF7;
+}
+.chat-input::placeholder { color: #A8A29E; }
+
+/* 已识别轮次预览：不同说话人用淡色左边框区分（我=橙，对方=灰蓝） */
+.turn-preview { margin-top: 12px; display: flex; flex-direction: column; gap: 6px; }
+.turn-preview .tp-label { font-size: 12px; color: var(--muted); }
+.turn-line {
+  border-left: 3px solid var(--line);
+  padding: 4px 10px;
+  border-radius: 0 8px 8px 0;
+  font-size: 13px;
+  background: #FAFAF9;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.turn-line.me { border-left-color: var(--primary); background: #FFF1E4; }
+.turn-line.other { border-left-color: #94A3B8; background: #F4F7FA; }
+
+/* 按钮区：主按钮宽大实心，次按钮描边，同一行 */
+.btn-row { display: flex; gap: 12px; margin-top: 16px; }
+.btn {
+  border-radius: var(--radius-ctl);
+  font-size: 14px; font-weight: 600;
+  padding: 12px 20px;
+  cursor: pointer;
+  display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+  transition: background 150ms, box-shadow 150ms, transform 150ms;
+}
+.btn-primary {
+  flex: 1;
+  background: var(--primary); color: #fff; border: none;
+}
+.btn-primary:hover { background: var(--primary-hover); }
+.btn-primary:active { background: var(--primary-active); transform: translateY(1px); }
+.btn-primary:disabled { background: #FDBA74; cursor: not-allowed; }
+.btn-secondary {
+  background: var(--card); color: var(--primary);
+  border: 1.5px solid var(--primary);
+}
+.btn-secondary:hover { background: #FFF1E4; }
+
+/* 【5】加载中 spinner */
+.spinner {
+  width: 16px; height: 16px;
+  border: 2px solid rgba(255,255,255,.4);
+  border-top-color: #fff;
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* 隐私提示条：锁图标 + 12–13px，颜色不过淡 */
+.privacy-note {
+  margin-top: 16px;
+  display: flex; align-items: flex-start; gap: 8px;
+  padding: 10px 12px;
+  background: #FFFBEB;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  font-size: 12.5px;
+  color: #57534E;            /* 米橙底上对比度 > 4.5:1 */
+}
+.privacy-note svg { flex-shrink: 0; margin-top: 1px; }
+
+/* ===================== 【4a】结论横幅 ===================== */
+.risk-banner {
+  grid-column: 1 / -1;
+  display: flex; align-items: center; gap: 16px;
+  border-radius: var(--radius-card);
+  padding: 20px 24px;
+  box-shadow: var(--shadow);
+}
+.risk-banner.mid { background: var(--risk-mid-bg); color: var(--risk-mid-text); }
+.risk-icon {
+  width: 48px; height: 48px; border-radius: 50%;
+  background: rgba(255,255,255,.65);
+  display: flex; align-items: center; justify-content: center;
+  flex-shrink: 0;
+}
+.risk-level { font-size: 20px; font-weight: 700; white-space: nowrap; }
+.risk-conclusion { font-size: 14px; margin-left: auto; max-width: 60%; }
+
+/* ===================== 【4b】指标网格 ===================== */
+.results { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; }
+.metric-risk {
+  grid-column: span 2; grid-row: span 2;
+  display: flex; flex-direction: column; justify-content: center; gap: 8px;
+  background: var(--card);
+}
+.risk-badge {
+  display: inline-flex; align-items: center; gap: 8px;
+  padding: 6px 14px; border-radius: 999px;
+  font-size: 15px; font-weight: 700;
+  width: fit-content;
+}
+.risk-badge.mid { background: var(--risk-mid-bg); color: var(--risk-mid-text); }
+.metric-risk .big { font-size: 40px; font-weight: 700; }
+.metric-risk .desc { font-size: var(--fs-caption); color: var(--muted); }
+
+.metric-card { position: relative; display: flex; flex-direction: column; gap: 4px; }
+.metric-head { display: flex; align-items: center; gap: 6px; font-size: var(--fs-caption); color: var(--muted); }
+.metric-num { font-size: var(--fs-metric); font-weight: var(--fw-metric); line-height: 1.2; }
+.metric-cap { font-size: 12.5px; color: var(--muted); }
+
+/* ⓘ 图标 + 悬停说明（hover 与键盘 focus 都可触发） */
+.info-btn {
+  margin-left: auto;
+  border: none; background: none; cursor: help;
+  color: #A8A29E; padding: 2px; border-radius: 50%;
+  position: relative;
+}
+.info-btn:hover, .info-btn:focus-visible { color: var(--primary); }
+.tip {
+  position: absolute; right: 0; top: 26px; z-index: 10;
+  width: 200px; padding: 10px 12px;
+  background: #1F2937; color: #F9FAFB;
+  font-size: 12px; line-height: 1.5; border-radius: 8px;
+  opacity: 0; pointer-events: none;
+  transition: opacity 150ms;
+}
+.info-btn:hover .tip, .info-btn:focus-visible .tip { opacity: 1; }
+
+/* ===================== 【4c】情绪时间线卡片 ===================== */
+.timeline-card { grid-column: 1 / -1; }
+.timeline-body { height: 200px; }
+.timeline-legend { display: flex; gap: 16px; font-size: 12px; color: var(--muted); margin-top: 8px; }
+.timeline-legend span { display: inline-flex; align-items: center; gap: 6px; }
+.lg-dot { width: 10px; height: 10px; border-radius: 50%; display: inline-block; }
+
+/* ===================== 【4d】回复建议区 ===================== */
+.suggestions { grid-column: 1 / -1; display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
+.sg-style {
+  display: inline-block; font-size: 12px; font-weight: 600;
+  color: var(--primary); background: #FFF1E4;
+  padding: 3px 10px; border-radius: 999px; margin-bottom: 8px;
+}
+.sg-text { font-size: 14px; line-height: 1.7; }
+.sg-copy { margin-top: 12px; font-size: 12.5px; color: var(--muted); background: none; border: none; cursor: pointer; padding: 0; }
+.sg-copy:hover { color: var(--primary); }
+
+/* ===================== 【5】空状态 / 骨架屏 ===================== */
+.empty-state {
+  grid-column: 1 / -1;
+  text-align: center; padding: 64px 24px;
+  color: var(--muted);
+}
+.empty-state .emoji { font-size: 48px; display: block; margin-bottom: 12px; }
+.empty-state p { font-size: 14px; }
+
+.skeleton-wrap { grid-column: 1 / -1; display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; }
+.skeleton {
+  border-radius: var(--radius-card);
+  background: linear-gradient(90deg, #FBF1E3 25%, #F6E7D2 50%, #FBF1E3 75%);
+  background-size: 200% 100%;
+  animation: shimmer 1.4s infinite;
+  min-height: 120px;
+}
+.skeleton.wide { grid-column: 1 / -1; min-height: 96px; }
+.skeleton.tall { grid-column: span 2; grid-row: span 2; min-height: 200px; }
+@keyframes shimmer { 0% { background-position: 200% 0; } 100% { background-position: -200% 0; } }
+
+/* ===================== 【6】响应式断点 ===================== */
+/* 平板 <1024px：单列，输入在上；指标 2 列，风险大卡占整行 */
+@media (max-width: 1023px) {
+  .main { grid-template-columns: 1fr; }
+  .col-input { position: static; }
+  .results, .skeleton-wrap { grid-template-columns: repeat(2, 1fr); }
+  .metric-risk, .skeleton.tall { grid-column: 1 / -1; grid-row: auto; }
+  .suggestions { grid-template-columns: 1fr; }
+  .risk-conclusion { max-width: none; margin-left: 0; }
+  .risk-banner { flex-wrap: wrap; }
+}
+/* 手机 <640px：按钮纵向撑满；指标小卡 2 列横排 */
+@media (max-width: 639px) {
+  .brand h1 { font-size: 20px; }
+  .usage { min-width: 110px; }
+  .btn-row { flex-direction: column; }
+  .btn { width: 100%; }
+  .results, .skeleton-wrap { grid-template-columns: repeat(2, 1fr); }
+  .metric-num { font-size: 26px; }
+  .timeline-body { height: 160px; }
+}
+
+/* 【6】减少动态偏好 */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation: none !important;
+    transition: none !important;
+  }
+}
+</style>
+</head>
+<body>
+
+<!-- ===================== 【2】顶部栏 ===================== -->
+<header class="topbar wrap">
+  <div class="brand">
+    <h1>时序感知高情商聊天助手</h1>
+    <p>粘贴聊天记录，看清情绪走向</p>
+  </div>
+  <div class="topbar-right">
+    <div class="usage" role="status" aria-label="本月大模型额度已用 0.191 元，预算 1.5 元">
+      <span class="usage-label">本月已用 ¥0.191 / ¥1.5</span>
+      <div class="usage-track"><div class="usage-fill"></div></div>
+    </div>
+    <span class="status-pill"><span class="status-dot"></span>已接入</span>
+    <button class="icon-btn" aria-label="设置">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09a1.65 1.65 0 0 0-1-1.51 1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09a1.65 1.65 0 0 0 1.51-1 1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33h.01a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51h.01a1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82v.01a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+    </button>
+  </div>
+</header>
+
+<main class="main wrap">
+
+  <!-- ===================== 【3】输入卡片（左栏 sticky） ===================== -->
+  <section class="col-input">
+    <div class="card">
+      <h2 class="card-title">聊天记录输入</h2>
+      <p class="card-hint">支持直接粘贴微信 / QQ 导出的聊天文本</p>
+
+      <textarea id="chatInput" class="chat-input" aria-label="聊天记录输入框" placeholder="粘贴聊天记录，例如：
+我：在忙吗？
+对方：还行，怎么了
+我：想和你聊聊昨天的事"></textarea>
+
+      <!-- 说话人行区分预览（我=橙，对方=灰蓝） -->
+      <div class="turn-preview" id="turnPreview" hidden>
+        <span class="tp-label">已识别 <b id="turnCount">0</b> 轮对话</span>
+        <div id="turnLines"></div>
+      </div>
+
+      <div class="btn-row">
+        <button class="btn btn-primary" id="analyzeBtn">开始分析</button>
+        <button class="btn btn-secondary" id="demoBtn">载入示例</button>
+        <button class="btn btn-secondary" id="ocrBtn" aria-label="上传截图识别文字">📷 上传截图识别</button>
+      </div>
+
+      <div class="privacy-note">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+        <span>聊天记录仅在你的电脑上本地分析，不会上传到任何服务器；截图识别使用 macOS 系统离线能力，图片不出本机。</span>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===================== 【4】结果区（右栏） ===================== -->
+  <section class="results" id="resultsArea" aria-live="polite">
+
+    <!-- 【5】空状态：插画占位 + 引导文案 -->
+    <div class="empty-state card" id="emptyState">
+      <span class="emoji">💬</span>
+      <p>粘贴一段聊天记录，或点击「载入示例」，<br>我会帮你分析整段对话的情绪走向。</p>
+    </div>
+
+    <!-- 【5】分析中骨架屏（默认隐藏） -->
+    <div class="skeleton-wrap" id="skeleton" hidden>
+      <div class="skeleton wide"></div>
+      <div class="skeleton tall"></div>
+      <div class="skeleton"></div>
+      <div class="skeleton"></div>
+      <div class="skeleton"></div>
+      <div class="skeleton"></div>
+      <div class="skeleton wide" style="min-height:200px"></div>
+    </div>
+
+    <!-- 分析结果（默认隐藏，示例数据：中风险 / 平稳 / 2 / 2 / 0.72） -->
+    <div id="resultsContent" hidden>
+
+      <!-- 【4a】结论横幅：图标 + 等级大字 + 一句话结论，风险浅色底 -->
+      <div class="risk-banner mid" role="alert">
+        <div class="risk-icon" aria-hidden="true">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#92400E" stroke-width="2" stroke-linecap="round"><path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+        </div>
+        <span class="risk-level">冲突风险：中</span>
+        <span class="risk-conclusion">对话中后段出现两次情绪翻转，负向情绪有积累迹象，建议主动缓和。</span>
+      </div>
+
+      <!-- 【4b】指标网格：风险大卡 2×2 + 4 张小卡 -->
+      <div class="card metric-risk">
+        <span class="risk-badge mid">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+          中风险
+        </span>
+        <span class="big">中</span>
+        <span class="desc">由情绪趋势启发式规则估算，阈值未经人工校准，仅供参考</span>
+      </div>
+
+      <div class="card metric-card">
+        <div class="metric-head">
+          📈 情绪走势
+          <button class="info-btn" aria-label="情绪走势说明">
+            ⓘ<span class="tip">整段对话负向情绪的斜率方向：上升 / 平稳 / 下降。</span>
+          </button>
+        </div>
+        <span class="metric-num">平稳</span>
+        <span class="metric-cap">整体未持续恶化</span>
+      </div>
+
+      <div class="card metric-card">
+        <div class="metric-head">
+          🔄 情绪翻转点
+          <button class="info-btn" aria-label="情绪翻转点说明">
+            ⓘ<span class="tip">情绪极性发生正负切换的轮次数量，翻转越多说明对话越不稳定。</span>
+          </button>
+        </div>
+        <span class="metric-num">2</span>
+        <span class="metric-cap">中后段各出现一次</span>
+      </div>
+
+      <div class="card metric-card">
+        <div class="metric-head">
+          ⛓️ 连续负向区间
+          <button class="info-btn" aria-label="连续负向区间说明">
+            ⓘ<span class="tip">连续多轮保持负向情绪的片段个数，是冲突积累的信号之一。</span>
+          </button>
+        </div>
+        <span class="metric-num">2</span>
+        <span class="metric-cap">最长连续 3 轮</span>
+      </div>
+
+      <div class="card metric-card">
+        <div class="metric-head">
+          🌡️ 负向情绪占比
+          <button class="info-btn" aria-label="负向情绪占比说明">
+            ⓘ<span class="tip">各轮负向情绪概率的平均值，0–1 之间，越高越紧张。（示例数据）</span>
+          </button>
+        </div>
+        <span class="metric-num">0.72</span>
+        <span class="metric-cap">高于日常闲聊基线</span>
+      </div>
+
+      <!-- 【4c】情绪时间线卡片：预留折线图位置，标出翻转点与连续负向区间 -->
+      <div class="card timeline-card">
+        <h2 class="card-title">情绪时间线</h2>
+        <p class="card-hint">橙色圆点为翻转点，浅色区间为连续负向片段（示意数据）</p>
+        <div class="timeline-body">
+          <svg viewBox="0 0 640 180" width="100%" height="100%" preserveAspectRatio="none" role="img" aria-label="情绪随对话轮次变化的折线示意图">
+            <!-- 连续负向区间阴影 -->
+            <rect x="280" y="20" width="120" height="140" fill="#FEE2E2" opacity="0.45" rx="6"/>
+            <rect x="480" y="20" width="100" height="140" fill="#FEE2E2" opacity="0.45" rx="6"/>
+            <!-- 零轴 -->
+            <line x1="0" y1="90" x2="640" y2="90" stroke="#F0E4D4" stroke-width="1" stroke-dasharray="4 4"/>
+            <!-- 我（橙） -->
+            <polyline points="20,60 80,70 140,55 200,85 260,110 320,125 380,118 440,95 500,120 560,130 620,100"
+              fill="none" stroke="#F97316" stroke-width="2.5" stroke-linejoin="round"/>
+            <!-- 对方（灰蓝） -->
+            <polyline points="20,70 80,65 140,80 200,75 260,100 320,135 380,128 440,110 500,105 560,140 620,115"
+              fill="none" stroke="#94A3B8" stroke-width="2.5" stroke-linejoin="round"/>
+            <!-- 翻转点标记 -->
+            <circle cx="260" cy="110" r="6" fill="#fff" stroke="#F97316" stroke-width="3"/>
+            <circle cx="500" cy="120" r="6" fill="#fff" stroke="#F97316" stroke-width="3"/>
+          </svg>
+        </div>
+        <div class="timeline-legend">
+          <span><i class="lg-dot" style="background:#F97316"></i>我</span>
+          <span><i class="lg-dot" style="background:#94A3B8"></i>对方</span>
+          <span><i class="lg-dot" style="background:#FEE2E2"></i>连续负向区间</span>
+        </div>
+      </div>
+
+      <!-- 【4d】回复建议区：三张并排卡片 -->
+      <div class="suggestions">
+        <div class="card">
+          <span class="sg-style">温和安抚型</span>
+          <p class="sg-text">「我感觉我们刚才都有点急了，不如先喝口水，我等你说完再说我的想法，好吗？」</p>
+          <button class="sg-copy">📋 复制这条回复</button>
+        </div>
+        <div class="card">
+          <span class="sg-style">直面问题型</span>
+          <p class="sg-text">「我想弄清楚你介意的点是哪一个，我们一个一个说，我不想猜错你的意思。」</p>
+          <button class="sg-copy">📋 复制这条回复</button>
+        </div>
+        <div class="card">
+          <span class="sg-style">幽默化解型</span>
+          <p class="sg-text">「再这么说下去咱们要变成辩论赛了，要不暂停一下，点个奶茶回来继续？」</p>
+          <button class="sg-copy">📋 复制这条回复</button>
+        </div>
+      </div>
+
+    </div>
+  </section>
+</main>
+
+<script>
+/* 仅用于设计稿演示交互状态（加载中 → 骨架屏 → 结果），不涉及业务逻辑 */
+const $ = (id) => document.getElementById(id);
+
+/* 【5】开始分析：按钮 loading + 骨架屏 + 结果 */
+$("analyzeBtn").addEventListener("click", () => {
+  const btn = $("analyzeBtn");
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spinner"></span> 分析中…';
+  $("emptyState").hidden = true;
+  $("resultsContent").setAttribute("hidden", "");
+  $("skeleton").hidden = false;
+  setTimeout(() => {
+    $("skeleton").hidden = true;
+    $("resultsContent").removeAttribute("hidden");
+    btn.disabled = false;
+    btn.textContent = "开始分析";
+  }, 1800);
+});
+
+/* 载入示例：填充文本框并渲染说话人行预览 */
+$("demoBtn").addEventListener("click", () => {
+  const lines = [
+    ["me", "我：在忙吗？"],
+    ["other", "对方：还行，怎么了"],
+    ["me", "我：昨天你一直没回我消息"],
+    ["other", "对方：我看到了，就是不想回"],
+    ["me", "我：你这样说让我挺难受的"],
+    ["other", "对方：随便你怎么想吧"],
+  ];
+  $("chatInput").value = lines.map(([_, t]) => t).join("\n");
+  $("turnPreview").hidden = false;
+  $("turnCount").textContent = lines.length;
+  $("turnLines").innerHTML = lines
+    .map(([cls, t]) => `<div class="turn-line ${cls}">${t}</div>`)
+    .join("");
+});
+</script>
+</body>
+</html>
