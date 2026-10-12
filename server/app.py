@@ -121,12 +121,12 @@ def call_llm(turns: list[dict], key: str, base_url: str, model: str,
             {"role": "system", "content": LLM_SYSTEM_PROMPT},
             {"role": "user", "content": f"对话及情绪识别结果：\n{timeline}"},
         ],
-        # 注意：kimi-k3 等模型仅允许 temperature=1，且不支持 response_format，
-        # 如需这两个参数请先确认模型支持
+        # 注意：部分 Kimi 模型（如 kimi-k3）仅允许 temperature=1，且不支持
+        # response_format，如需这两个参数请先确认所用模型支持
     }
     headers = {"Authorization": f"Bearer {key}", "Content-Type": "application/json"}
     url = f"{base_url.rstrip('/')}/chat/completions"
-    # kimi-k3 生成结构化长文常超过 60s，放宽读取超时；超时后自动重试一次
+    # 思考型模型生成结构化长文常超过 60s，放宽读取超时；超时后自动重试一次
     resp = None
     last_err: Exception | None = None
     for attempt in range(2):
@@ -174,11 +174,11 @@ USAGE_LOG = PROJECT_ROOT / "outputs" / "llm_usage.jsonl"
 
 
 def llm_prices_and_budget(file_cfg: dict) -> tuple[float, float, float]:
-    """单价（元/百万 tokens）与预算（元）。默认值为 kimi-k3 中国站官方价
-    （输入 ¥20 / 输出 ¥100，2026-10 查询；缓存命中会更便宜，故估算偏保守）。
+    """单价（元/百万 tokens）与预算（元）。默认值为 kimi-k2.6 中国站官方价
+    （输入 ¥6.5 / 输出 ¥27，2026-10 查询 platform.kimi.com；缓存命中更便宜，故估算偏保守）。
     可在 configs/llm.yaml 用 price_in_per_million / price_out_per_million / budget_yuan 覆盖。"""
-    pin = float(file_cfg.get("price_in_per_million", 20.0))
-    pout = float(file_cfg.get("price_out_per_million", 100.0))
+    pin = float(file_cfg.get("price_in_per_million", 6.5))
+    pout = float(file_cfg.get("price_out_per_million", 27.0))
     budget = float(file_cfg.get("budget_yuan", 1.5))
     return pin, pout, budget
 
@@ -207,7 +207,7 @@ def usage_totals(pin: float, pout: float) -> dict:
 
 def record_usage(usage: dict, model: str, pin: float, pout: float) -> None:
     pt = usage.get("prompt_tokens", 0)
-    ct = usage.get("completion_tokens", 0)  # kimi-k3 思考 tokens 计入输出
+    ct = usage.get("completion_tokens", 0)  # 思考型模型的思考 tokens 计入输出
     cost = pt * pin / 1e6 + ct * pout / 1e6
     USAGE_LOG.parent.mkdir(parents=True, exist_ok=True)
     with open(USAGE_LOG, "a", encoding="utf-8") as f:
@@ -305,7 +305,7 @@ def analyze(
     file_cfg = load_llm_file_config()
     key = x_llm_key or file_cfg.get("api_key")
     base_url = x_llm_base_url or file_cfg.get("base_url", "https://api.moonshot.cn/v1")
-    model_name = x_llm_model or file_cfg.get("model", "kimi-k3")
+    model_name = x_llm_model or file_cfg.get("model", "kimi-k2.6")
 
     suggestions = None
     llm_status = "not_configured"
