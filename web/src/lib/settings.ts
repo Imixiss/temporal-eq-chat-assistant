@@ -9,7 +9,7 @@ export function loadLlmSettings(): LlmSettings {
   } catch {
     /* ignore */
   }
-  return { provider: 'kimi', baseUrl: 'https://api.moonshot.cn/v1', model: 'kimi-k3', apiKey: '' }
+  return { provider: 'kimi', baseUrl: 'https://api.moonshot.cn/v1', model: 'kimi-k2.6', apiKey: '' }
 }
 
 export function saveLlmSettings(s: LlmSettings) {

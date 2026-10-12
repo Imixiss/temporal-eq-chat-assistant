@@ -62,7 +62,7 @@ export interface LlmSettings {
 }
 
 export const LLM_PROVIDERS: Record<string, { label: string; baseUrl: string; model: string }> = {
-  kimi: { label: 'Kimi（月之暗面）', baseUrl: 'https://api.moonshot.cn/v1', model: 'kimi-k3' },
+  kimi: { label: 'Kimi（月之暗面）', baseUrl: 'https://api.moonshot.cn/v1', model: 'kimi-k2.6' },
   deepseek: { label: 'DeepSeek', baseUrl: 'https://api.deepseek.com/v1', model: 'deepseek-chat' },
   openai: { label: 'OpenAI', baseUrl: 'https://api.openai.com/v1', model: 'gpt-4o-mini' },
   custom: { label: '自定义（OpenAI 兼容）', baseUrl: '', model: '' },
